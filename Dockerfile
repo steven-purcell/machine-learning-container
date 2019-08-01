@@ -1,12 +1,14 @@
-FROM python:alpine
+FROM python:3.7-slim
 
-RUN echo "http://dl-8.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+RUN apt-get -y update && apt-get install -y --no-install-recommends \
+         wget \
+         python3.5 \
+         nginx \
+         ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Add HDF5 support
-RUN apk add --no-cache --allow-untrusted --repository http://dl-3.alpinelinux.org/alpine/edge/testing hdf5 hdf5-dev
-RUN apk --no-cache --update-cache add gcc gfortran python python-dev py-pip build-base wget freetype-dev libpng-dev openblas-dev
-RUN ln -s /usr/include/locale.h /usr/include/xlocale.h
-RUN pip install numpy scipy pandas sklearn flask gevent gunicorn pyod kmodes
+RUN pip install numpy scipy pandas sklearn flask gevent gunicorn && \
+    pyod kmodes tensorflow torch
 
 ENV AWS_DEFAULT_REGION=us-gov-west-1
 ENV PYTHONUNBUFFERED=TRUE
