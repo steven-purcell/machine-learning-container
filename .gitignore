@@ -1,0 +1,9 @@
+.idea/
+
+*.DS_Store
+
+local_test/model/
+local_test/output/.keep
+
+local_test/output/
+!local_test/model/.keep

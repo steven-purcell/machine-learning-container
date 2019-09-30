@@ -20,7 +20,7 @@ RUN pip3 install \
 ENV AWS_DEFAULT_REGION=us-gov-west-1
 ENV PYTHONUNBUFFERED=TRUE
 ENV PYTHONDONTWRITEBYTECODE=TRUE
-ENV PATH="/opt/ml:${PATH}"
+ENV PATH="/opt/program:${PATH}"
 
-COPY model /opt/ml
-WORKDIR /opt/ml
+COPY model /opt/program
+WORKDIR /opt/program
