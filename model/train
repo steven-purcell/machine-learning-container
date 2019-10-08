@@ -16,14 +16,13 @@ from sklearn.ensemble import RandomForestClassifier
 
 # These are the paths to where SageMaker mounts interesting things in your container.
 
-prefix = '/opt/program/'
+prefix = '/opt/ml/'
 
 input_path = prefix + 'input/data'
 output_path = os.path.join(prefix, 'output')
 model_path = os.path.join(prefix, 'model')
 
-# This algorithm has a single channel of input data called 'training'. Since we run in
-# File mode, the input files are copied to the directory specified here.
+# This algorithm has a single input channel that must match the input_channel provided at call time. 'train' here
 channel_name='train'
 training_path = os.path.join(input_path, channel_name)
 
@@ -61,7 +60,7 @@ def train():
         clf = clf.fit(X_train, y_train)
 
         # save the model
-        with open(os.path.join(model_path, 'model.pkl'), 'w') as out:
+        with open(os.path.join(model_path, 'model.pkl'), 'wb') as out:
             pickle.dump(clf, out)
         print('Training complete.')
 
