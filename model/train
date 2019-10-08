@@ -16,7 +16,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 # These are the paths to where SageMaker mounts interesting things in your container.
 
-prefix = '/opt/ml/'
+prefix = '/opt/program/'
 
 input_path = prefix + 'input/data'
 output_path = os.path.join(prefix, 'output')
@@ -25,7 +25,7 @@ model_path = os.path.join(prefix, 'model')
 # This algorithm has a single channel of input data called 'training'. Since we run in
 # File mode, the input files are copied to the directory specified here.
 channel_name='train'
-training_path = '/opt/ml/input/data/train/'
+training_path = os.path.join(input_path, channel_name)
 
 
 # The function to execute the training.
@@ -61,15 +61,15 @@ def train():
         clf = clf.fit(X_train, y_train)
 
         # save the model
-        with open(os.path.join(model_path, 'model.pkl'), 'wb') as out:
-            pickle.dump(clf, out, protocol=0)
+        with open(os.path.join(model_path, 'model.pkl'), 'w') as out:
+            pickle.dump(clf, out)
         print('Training complete.')
 
     except Exception as e:
         # Write out an error file. This will be returned as the failureReason in the
         # DescribeTrainingJob result.
         trc = traceback.format_exc()
-        with open(os.path.join(output_path, 'failure'), 'w') as s:
+        with open(os.path.join(output_path, 'failure'), 'w+') as s:
             s.write('Exception during training: ' + str(e) + '\n' + trc)
         # Printing this causes the exception to be in the training job logs, as well.
         print('Exception during training: ' + str(e) + '\n' + trc, file=sys.stderr)
