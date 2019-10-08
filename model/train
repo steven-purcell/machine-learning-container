@@ -43,7 +43,7 @@ def train():
     try:
 
         # Take the set of files and read them all into a single pandas dataframe
-        input_files = [os.path.join(training_path, file) for file in listdir_nohidden(training_path)]
+        input_files = [os.path.join(training_path, file) for file in os.listdir(training_path)]
 
         if len(input_files) == 0:
             raise ValueError(('There are no files in {}.\n' +
@@ -75,12 +75,6 @@ def train():
         print('Exception during training: ' + str(e) + '\n' + trc, file=sys.stderr)
         # A non-zero exit code causes the training job to be marked as Failed.
         sys.exit(255)
-
-
-def listdir_nohidden(path):
-    for f in os.listdir(path):
-        if not f.startswith('.'):
-            yield f
 
 
 if __name__ == '__main__':
