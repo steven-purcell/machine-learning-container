@@ -10,6 +10,7 @@ import logging
 import flask
 import pandas as pd
 
+# These are the paths to where SageMaker mounts interesting things in your container.
 prefix = '/opt/ml/'
 model_path = os.path.join(prefix, 'model')
 

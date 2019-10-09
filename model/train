@@ -13,9 +13,9 @@ import traceback
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn import metrics
 
 # These are the paths to where SageMaker mounts interesting things in your container.
-
 prefix = '/opt/ml/'
 
 input_path = prefix + 'input/data'
@@ -26,18 +26,14 @@ model_path = os.path.join(prefix, 'model')
 channel_name='train'
 training_path = os.path.join(input_path, channel_name)
 
+# validate channel details.
+channel_name_2 = 'validate'
+validation_path = os.path.join(input_path, channel_name_2)
+
 
 # The function to execute the training.
 def train():
-    """
-                Train and fit classification model
-                :param<clf>: Classification object.
-                :param<X_train>: Pandas dataframe of features.
-                :param<y_train>: Pandas dataframe of the y to be predicted.
 
-                :return: On success fitting data, else None.
-
-    """
     print('Starting the training.')
     try:
 
@@ -56,10 +52,14 @@ def train():
         X_train = train_data.iloc[:, 1:]
         y_train = train_data.iloc[:, 0]
 
+        # Make the classifier an import from another file. model.py perhaps.
         clf = RandomForestClassifier()
         clf = clf.fit(X_train, y_train)
 
-        # save the model
+        # Call validation function to cross_validation.
+        validate(clf)
+
+        # save the model as model.pkl. This is tarballed and written out to S3
         with open(os.path.join(model_path, 'model.pkl'), 'wb') as out:
             pickle.dump(clf, out)
         print('Training complete.')
@@ -75,6 +75,29 @@ def train():
         # A non-zero exit code causes the training job to be marked as Failed.
         sys.exit(255)
 
+def validate(clf):
+    input_files = [os.path.join(validation_path, file) for file in os.listdir(validation_path)]
+
+    if len(input_files) == 0:
+        raise ValueError(('There are no files in {}.\n' +
+                          'This usually indicates that the channel ({}) was incorrectly specified,\n' +
+                          'the data specification in S3 was incorrectly specified or the role specified\n' +
+                          'does not have permission to access the data.').format(validation_path, channel_name))
+    raw_data = [pd.read_csv(file, header=None) for file in input_files]
+    validate_data = pd.concat(raw_data)
+
+    # Split the data with label (response variable) as the first column
+    X_cv = validate_data.iloc[:, 1:]
+    y_cv = validate_data.iloc[:, 0]
+    record_count = len(y_cv)
+
+    # Validation channel actions take place here.
+    preds = clf.predict(X_cv)
+
+    # Calculate performance metrics
+    scores = metrics.accuracy_score(y_cv, preds)
+    acc_score = scores/record_count
+    print('Validation accuracy score: ' + str(acc_score))
 
 if __name__ == '__main__':
     train()
