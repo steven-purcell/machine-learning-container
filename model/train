@@ -13,37 +13,32 @@ import traceback
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn import metrics
 
 # These are the paths to where SageMaker mounts interesting things in your container.
-
 prefix = '/opt/ml/'
 
 input_path = prefix + 'input/data'
 output_path = os.path.join(prefix, 'output')
 model_path = os.path.join(prefix, 'model')
 
-# This algorithm has a single channel of input data called 'training'. Since we run in
-# File mode, the input files are copied to the directory specified here.
+# This algorithm has a single input channel that must match the input_channel provided at call time. 'train' here
 channel_name='train'
-training_path = '/opt/ml/input/data/train/'
+training_path = os.path.join(input_path, channel_name)
+
+# validate channel details.
+channel_name_2 = 'validate'
+validation_path = os.path.join(input_path, channel_name_2)
 
 
 # The function to execute the training.
 def train():
-    """
-                Train and fit classification model
-                :param<clf>: Classification object.
-                :param<X_train>: Pandas dataframe of features.
-                :param<y_train>: Pandas dataframe of the y to be predicted.
 
-                :return: On success fitting data, else None.
-
-    """
     print('Starting the training.')
     try:
 
         # Take the set of files and read them all into a single pandas dataframe
-        input_files = [os.path.join(training_path, file) for file in listdir_nohidden(training_path)]
+        input_files = [os.path.join(training_path, file) for file in os.listdir(training_path)]
 
         if len(input_files) == 0:
             raise ValueError(('There are no files in {}.\n' +
@@ -57,31 +52,52 @@ def train():
         X_train = train_data.iloc[:, 1:]
         y_train = train_data.iloc[:, 0]
 
+        # Make the classifier an import from another file. model.py perhaps.
         clf = RandomForestClassifier()
         clf = clf.fit(X_train, y_train)
 
-        # save the model
+        # Call validation function to cross_validation.
+        validate(clf)
+
+        # save the model as model.pkl. This is tarballed and written out to S3
         with open(os.path.join(model_path, 'model.pkl'), 'wb') as out:
-            pickle.dump(clf, out, protocol=0)
+            pickle.dump(clf, out)
         print('Training complete.')
 
     except Exception as e:
         # Write out an error file. This will be returned as the failureReason in the
         # DescribeTrainingJob result.
         trc = traceback.format_exc()
-        with open(os.path.join(output_path, 'failure'), 'w') as s:
+        with open(os.path.join(output_path, 'failure'), 'w+') as s:
             s.write('Exception during training: ' + str(e) + '\n' + trc)
         # Printing this causes the exception to be in the training job logs, as well.
         print('Exception during training: ' + str(e) + '\n' + trc, file=sys.stderr)
         # A non-zero exit code causes the training job to be marked as Failed.
         sys.exit(255)
 
+def validate(clf):
+    input_files = [os.path.join(validation_path, file) for file in os.listdir(validation_path)]
 
-def listdir_nohidden(path):
-    for f in os.listdir(path):
-        if not f.startswith('.'):
-            yield f
+    if len(input_files) == 0:
+        raise ValueError(('There are no files in {}.\n' +
+                          'This usually indicates that the channel ({}) was incorrectly specified,\n' +
+                          'the data specification in S3 was incorrectly specified or the role specified\n' +
+                          'does not have permission to access the data.').format(validation_path, channel_name))
+    raw_data = [pd.read_csv(file, header=None) for file in input_files]
+    validate_data = pd.concat(raw_data)
 
+    # Split the data with label (response variable) as the first column
+    X_cv = validate_data.iloc[:, 1:]
+    y_cv = validate_data.iloc[:, 0]
+    record_count = len(y_cv)
+
+    # Validation channel actions take place here.
+    preds = clf.predict(X_cv)
+
+    # Calculate performance metrics
+    scores = metrics.accuracy_score(y_cv, preds)
+    acc_score = scores/record_count
+    print('Validation accuracy score: ' + str(acc_score))
 
 if __name__ == '__main__':
     train()
